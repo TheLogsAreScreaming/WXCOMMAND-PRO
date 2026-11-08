@@ -7,6 +7,21 @@ import platform
 import subprocess
 import sys
 import tempfile
+import time
+
+
+def create_dmg(source: str, dmg: Path, attempts: int = 4, delay: float = 15) -> None:
+    """Run hdiutil create, retrying "Resource busy" failures on CI runners."""
+    for attempt in range(1, attempts + 1):
+        try:
+            subprocess.run(['hdiutil', 'create', '-ov', '-volname', 'WXCOMMAND-PRO',
+                            '-srcfolder', source, '-format', 'UDZO', str(dmg)], check=True)
+            return
+        except subprocess.CalledProcessError:
+            if attempt == attempts:
+                raise
+            print(f'hdiutil create failed (attempt {attempt}/{attempts}); retrying', flush=True)
+            time.sleep(delay)
 
 
 def build(root: Path) -> Path:
@@ -32,8 +47,7 @@ def build(root: Path) -> Path:
             'The Operator Center opens in its own window. Press Cmd-Q to quit.\n'
             'This prerelease is not Developer ID signed or notarized.\n'
             'Radio hardware and target macOS compatibility require separate verification.\n')
-        subprocess.run(['hdiutil', 'create', '-ov', '-volname', 'WXCOMMAND-PRO',
-                        '-srcfolder', temp, '-format', 'UDZO', str(dmg)], check=True)
+        create_dmg(temp, dmg)
     subprocess.run(['hdiutil', 'verify', str(dmg)], check=True)
     return bundle
 

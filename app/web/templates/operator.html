@@ -277,12 +277,25 @@
   try { (JSON.parse(localStorage.getItem(KEY)) || []).forEach(function(v, i){ if (steps[i]) steps[i].checked = !!v; }); } catch (e) {}
   steps.forEach(function(s){ s.addEventListener('change', stepUpdate); }); stepUpdate();
 
-  /* display-only warning map */
+  /* display-only warning map; the bundled outlines work offline and are optional */
+  var basemap;
+  function loadBasemap(){
+    if (!basemap) basemap = fetch('/static/us-basemap.json?v={{ asset_v }}').then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
+    return basemap;
+  }
   function loadMap(){
     var map = el('map'), status = el('map-status'), NS = 'http://www.w3.org/2000/svg';
-    fetch('/api/ux/map').then(function(r){ if (!r.ok) throw new Error('NWS map feed unavailable'); return r.json(); }).then(function(geo){
+    Promise.all([
+      fetch('/api/ux/map').then(function(r){ if (!r.ok) throw new Error('NWS map feed unavailable'); return r.json(); }),
+      loadBasemap()
+    ]).then(function(res){
+      var geo = res[0], base = res[1];
       map.replaceChildren();
       var svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', '0 0 720 360'); svg.setAttribute('aria-hidden', 'true');
+      function line(cls, d){ var p = document.createElementNS(NS, 'path'); p.setAttribute('class', cls); p.setAttribute('d', d); p.setAttribute('vector-effect', 'non-scaling-stroke'); return p; }
+      var counties = base ? line('map-county', base.counties) : null;
+      if (counties) { counties.setAttribute('display', 'none'); svg.append(counties); }
+      if (base) svg.append(line('map-state', base.states));
       var count = 0;
       geo.features.forEach(function(feature){
         var g = feature.geometry; if (!g) return;
@@ -309,6 +322,8 @@
         var cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
         svg.setAttribute('viewBox', [cx - w / 2 - pad, cy - h / 2 - pad / 2, w + pad * 2, h + pad].join(' '));
         svg.querySelectorAll('polygon').forEach(function(pg){ pg.setAttribute('vector-effect', 'non-scaling-stroke'); });
+        // County lines only help once the map is zoomed in past a few states.
+        if (counties && w < 240) counties.removeAttribute('display');
       }
       map.append(svg);
       status.textContent = count + ' warning area' + (count === 1 ? '' : 's') + ' (contiguous US, first 100 active alerts). Display only; it doesn\'t affect what gets broadcast.';
