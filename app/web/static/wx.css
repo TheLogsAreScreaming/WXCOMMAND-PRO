@@ -515,6 +515,8 @@ body.server-lost .conn-lost { display: flex; }
 /* Operator map */
 .map-frame { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); overflow: hidden; min-height: 160px; display: grid; place-items: center; }
 .map-frame svg { display: block; width: 100%; height: auto; max-height: 420px; }
+.map-frame .map-county { fill: none; stroke: var(--text-3); stroke-opacity: .4; stroke-width: .5; }
+.map-frame .map-state { fill: none; stroke: var(--text-3); stroke-width: 1; }
 .map-frame .map-poly { fill: var(--warning); fill-opacity: .28; stroke: var(--warning); stroke-width: 1.2; }
 
 /* Steps (guided setup) */

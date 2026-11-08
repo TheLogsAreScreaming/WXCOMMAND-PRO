@@ -47,3 +47,33 @@ def test_only_local_server_pages_stay_in_app_window():
     assert not is_app_url('https://github.com/BaconDisk22/WXCOMMAND-PRO/releases', origin)
     assert not is_app_url('http://127.0.0.1:9000/', origin)
     assert not is_app_url('https://127.0.0.1:8000/', origin)
+
+
+def test_dmg_creation_retries_busy_failures(monkeypatch, tmp_path):
+    import subprocess
+    from deploy import build_macos_app as b
+    calls = []
+
+    def flaky(cmd, check):
+        calls.append(cmd)
+        if len(calls) < 3:
+            raise subprocess.CalledProcessError(16, cmd)
+
+    monkeypatch.setattr(b.subprocess, "run", flaky)
+    monkeypatch.setattr(b.time, "sleep", lambda _: None)
+    b.create_dmg("src", tmp_path / "a.dmg")
+    assert len(calls) == 3
+
+
+def test_dmg_creation_gives_up_after_all_attempts(monkeypatch, tmp_path):
+    import subprocess
+    import pytest
+    from deploy import build_macos_app as b
+
+    def busy(cmd, check):
+        raise subprocess.CalledProcessError(16, cmd)
+
+    monkeypatch.setattr(b.subprocess, "run", busy)
+    monkeypatch.setattr(b.time, "sleep", lambda _: None)
+    with pytest.raises(subprocess.CalledProcessError):
+        b.create_dmg("src", tmp_path / "a.dmg", attempts=2)

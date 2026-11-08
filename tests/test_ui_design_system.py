@@ -56,7 +56,7 @@ def test_pages_use_the_shared_layout(client, path, title):
 
 
 def test_static_assets_are_served(client):
-    for name in ("wx.css", "wx.js", "htmx.min.js"):
+    for name in ("wx.css", "wx.js", "htmx.min.js", "us-basemap.json"):
         assert client.get("/static/" + name).status_code == 200
 
 
