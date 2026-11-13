@@ -55,6 +55,7 @@
     <a href="#radios">{{ icon("radio", "sm") }} Radios</a>
     <a href="#ipaws">{{ icon("shield", "sm") }} Public safety</a>
     <a href="#polling">{{ icon("clock", "sm") }} Polling &amp; time</a>
+    <a href="#export">{{ icon("download", "sm") }} Data export</a>
     <a href="#about">{{ icon("info", "sm") }} About &amp; updates</a>
   </nav>
 
@@ -200,6 +201,28 @@
       </div>
     </section>
 
+    <section class="card" id="export">
+      <div class="card-header"><h2>{{ icon("download") }} Data export</h2>
+        <p class="desc">Send the alert history, transmit log and radio health to your own InfluxDB or Prometheus, for Grafana dashboards. Off unless you turn it on here. See <code>docs/METRICS_EXPORT.md</code>.</p></div>
+      <div class="card-body form-grid">
+        <div class="field">
+          <label class="label" for="metrics_influx_url">InfluxDB write URL</label>
+          <input class="input" id="metrics_influx_url" name="metrics_influx_url" type="url" value="{{ metrics_influx_url }}" placeholder="http://influx.local:8086/api/v2/write?org=home&amp;bucket=wx" autocomplete="off" spellcheck="false">
+          <p class="help">Leave blank to send nothing. New history is pushed every minute.</p>
+        </div>
+        <div class="field">
+          <label class="label" for="metrics_influx_token">InfluxDB token</label>
+          <input class="input" id="metrics_influx_token" name="metrics_influx_token" type="password" value="" placeholder="{% if metrics_token_set %}Saved (leave blank to keep){% else %}Optional{% endif %}" autocomplete="off">
+          {% if metrics_token_set %}<label class="check"><input type="checkbox" name="metrics_influx_token_clear" value="1"> Forget the saved token</label>{% endif %}
+          <p class="help">Sent only to the URL above, as <code>Authorization: Token &hellip;</code>.</p>
+        </div>
+        <label class="switch-row">
+          <span class="switch-text"><b>Prometheus metrics page</b><small>Serves <code>/metrics</code> on this app's own address (this computer only, unless remote access is set up).</small></span>
+          <span class="switch"><input type="checkbox" name="metrics_prometheus_enabled" role="switch" {% if metrics_prometheus_enabled %}checked{% endif %}><span class="track"></span></span>
+        </label>
+      </div>
+    </section>
+
     <div class="action-bar">
       <span class="clean-note">Changes take effect as soon as you save.</span>
       <span class="dirty-note">{{ icon("alert", "sm") }} You have unsaved changes</span>
@@ -239,7 +262,7 @@
         links.forEach(function(a){ a.classList.toggle('is-active', a.getAttribute('href') === '#' + en.target.id); });
       });
     }, { rootMargin: '-80px 0px -60% 0px' });
-    ['coverage','alerts','radios','ipaws','polling','about'].forEach(function(id){ var s = document.getElementById(id); if (s) io.observe(s); });
+    ['coverage','alerts','radios','ipaws','polling','export','about'].forEach(function(id){ var s = document.getElementById(id); if (s) io.observe(s); });
   })();
 </script>
 {% endblock %}

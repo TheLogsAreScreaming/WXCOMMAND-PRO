@@ -17,7 +17,8 @@ concurrency:
 jobs:
   screenshots:
     name: Screenshot demo dashboard (Chromium)
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest is now 26.04, which Playwright 1.58 cannot install Chromium on.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4

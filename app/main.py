@@ -104,6 +104,11 @@ async def lifespan(app: FastAPI):
     app.state.startup_task = startup_task
     poller.start()
     ipaws.start()
+    # History export to InfluxDB: idle until a URL is saved in Settings.
+    from .metrics import InfluxExporter
+    exporter = InfluxExporter(db, tx, poller)
+    exporter.start()
+    app.state.metrics_exporter = exporter
 
     try:
         yield
@@ -119,6 +124,7 @@ async def lifespan(app: FastAPI):
         beat_task.cancel()
         if not startup_task.done():
             startup_task.cancel()
+        await exporter.stop()
         await poller.stop()
         await ipaws.stop()
         await tx.stop()
