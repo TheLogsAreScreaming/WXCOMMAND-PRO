@@ -91,6 +91,10 @@ DEFAULT_SETTINGS: dict = {
     "filter_include_exact": ["Tornado Watch"],
     "filter_include_suffix": ["Warning"],
     "filter_exclude_exact": [],
+    # History export (app/metrics.py, docs/METRICS_EXPORT.md). Both off.
+    "metrics_influx_url": "",
+    "metrics_influx_token": "",
+    "metrics_prometheus_enabled": False,
 }
 
 POLL_INTERVAL_MIN = 60

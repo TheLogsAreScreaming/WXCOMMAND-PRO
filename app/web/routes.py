@@ -230,6 +230,18 @@ def _dash_ctx(request) -> dict:
 
 
 # ---- liveness probe ----------------------------------------------------
+@router.get("/metrics", response_class=PlainTextResponse)
+async def prometheus_metrics(request: Request):
+    """Prometheus text format. 404 unless switched on in Settings > Data export."""
+    db = _db(request)
+    if not db.get_setting("metrics_prometheus_enabled", False):
+        return PlainTextResponse("metrics export is off (Settings > Data export)\n", status_code=404)
+    from ..metrics import render_prometheus, snapshot
+    body = render_prometheus(snapshot(db, getattr(request.app.state, "tx", None),
+                                      getattr(request.app.state, "poller", None)))
+    return PlainTextResponse(body, media_type="text/plain; version=0.0.4; charset=utf-8")
+
+
 @router.get("/healthz", response_class=PlainTextResponse)
 async def healthz(request: Request):
     # If this responds, the event loop is servicing requests (i.e. not wedged).
@@ -505,6 +517,9 @@ async def settings_page(request: Request):
         mc_connected=_status_flag(request, "meshcore"),
         mt_model=s.get("meshtastic_model", "") or "",
         mc_model=s.get("meshcore_model", "") or "",
+        metrics_influx_url=s.get("metrics_influx_url", "") or "",
+        metrics_token_set=bool(s.get("metrics_influx_token", "")),
+        metrics_prometheus_enabled=bool(s.get("metrics_prometheus_enabled", False)),
     )
 
 
@@ -534,6 +549,10 @@ async def save_settings(
     meshcore_channel: int = Form(0),
     meshtastic_test_channel: int = Form(1),
     meshcore_test_channel: int = Form(1),
+    metrics_influx_url: str = Form(""),
+    metrics_influx_token: str = Form(""),
+    metrics_influx_token_clear: str = Form(""),
+    metrics_prometheus_enabled: str = Form(""),
 ):
     def _rep(v):
         try:
@@ -569,6 +588,18 @@ async def save_settings(
     db.set_setting("meshcore_channel", int(meshcore_channel))
     db.set_setting("meshtastic_test_channel", int(meshtastic_test_channel))
     db.set_setting("meshcore_test_channel", int(meshcore_test_channel))
+
+    # Data export. A blank token field keeps the saved token (it is never
+    # shown back); the "forget" box clears it.
+    influx_url = metrics_influx_url.strip()
+    if influx_url and not re.match(r"^https?://", influx_url, re.I):
+        influx_url = ""
+    db.set_setting("metrics_influx_url", influx_url)
+    if metrics_influx_token_clear:
+        db.set_setting("metrics_influx_token", "")
+    elif metrics_influx_token.strip():
+        db.set_setting("metrics_influx_token", metrics_influx_token.strip())
+    db.set_setting("metrics_prometheus_enabled", bool(metrics_prometheus_enabled))
 
     # Rebuild transports from the new settings and (re)connect the enabled ones.
     await tx.reconfigure()

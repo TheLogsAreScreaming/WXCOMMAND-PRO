@@ -93,6 +93,17 @@ CREATE INDEX IF NOT EXISTS idx_ipaws_ts ON ipaws_log(ts);
 """
 
 
+def _after(stamp: str, now: datetime) -> bool:
+    """Is an ISO-8601 time (any offset; naive = UTC) later than now?"""
+    try:
+        when = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return when > now
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -393,6 +404,39 @@ class Database:
                 ("-%d days" % keep_days,))
             self._conn.commit()
             return cur.rowcount
+
+    # ---- metrics export (app/metrics.py) --------------------------------
+    def history_since(self, after_id: int, limit: int = 500) -> list[sqlite3.Row]:
+        """History rows with id > after_id, oldest first."""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT id, ts, nws_id, event, area, disposition FROM history "
+                "WHERE id > ? ORDER BY id LIMIT ?", (int(after_id), int(limit))).fetchall()
+
+    def transmit_since(self, after_id: int, limit: int = 500) -> list[sqlite3.Row]:
+        """Transmit log rows with id > after_id, oldest first."""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT id, ts, channel, byte_count, success, manual, transport "
+                "FROM transmit_log WHERE id > ? ORDER BY id LIMIT ?",
+                (int(after_id), int(limit))).fetchall()
+
+    def metric_counts(self) -> dict:
+        """Totals for the /metrics page, grouped the way it labels them."""
+        now = datetime.now(timezone.utc)
+        with self._lock:
+            alerts = self._conn.execute(
+                "SELECT event, disposition, COUNT(*) AS n FROM history "
+                "GROUP BY event, disposition").fetchall()
+            tx = self._conn.execute(
+                "SELECT COALESCE(transport, 'meshtastic') AS transport, success, manual, "
+                "COUNT(*) AS n, COALESCE(SUM(byte_count), 0) AS bytes FROM transmit_log "
+                "GROUP BY 1, 2, 3").fetchall()
+            expiries = [r[0] for r in self._conn.execute(
+                "SELECT expires FROM alert_state WHERE expires IS NOT NULL AND expires != ''")]
+            errors = self._conn.execute("SELECT COUNT(*) FROM errors").fetchone()[0]
+        return {"alerts": [dict(r) for r in alerts], "transmits": [dict(r) for r in tx],
+                "active_alerts": sum(1 for e in expiries if _after(e, now)), "errors": int(errors)}
 
     def close(self) -> None:
         with self._lock:
